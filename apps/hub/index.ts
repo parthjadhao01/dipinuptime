@@ -1,159 +1,265 @@
-import http from "http"
-import { v4 as uuidv4 } from 'uuid';
-import { type IncommingMessage, type SignUpIncommingMessage } from "@repo/common"
-import { PublicKey } from "@solana/web3.js"
-import nacl from "tweetnacl"
-import nacl_util from "tweetnacl-util"
-import { WebSocket, WebSocketServer } from "ws"
-import {db} from "./config/db"
+import http from "http";
+import { v4 as uuidv4 } from "uuid";
+import {
+    type IncommingMessage,
+    type SignUpIncommingMessage,
+    type ValidateIncommingMessage,
+} from "@repo/common";
+import { PublicKey } from "@solana/web3.js";
+import nacl from "tweetnacl";
+import nacl_util from "tweetnacl-util";
+import { WebSocket, WebSocketServer } from "ws";
+import { db } from "./config/db";
 
-const availableValidators: { validatorId: string, socket: WebSocket, publicKey: string }[] = [];
-const CALLBACKS: { [callbackId: string]: (data: IncommingMessage) => void } = {};
-const COST_PER_VALDATION = 100;
+type AvailableValidator = {
+    validatorId: string;
+    socket: WebSocket;
+    publicKey: string;
+};
+
+type PendingCallback = {
+    handler: (data: ValidateIncommingMessage) => Promise<void>;
+    timeout: ReturnType<typeof setTimeout>;
+};
+
+const availableValidators: AvailableValidator[] = [];
+const CALLBACKS = new Map<string, PendingCallback>();
+const COST_PER_VALIDATION = 100;
+const VALIDATION_TIMEOUT_MS = 30_000;
 
 const server = http.createServer();
 const wss = new WebSocketServer({ noServer: true });
 
-server.on("upgrade", async (req, socket, head) => {
+server.on("upgrade", (req, socket, head) => {
     try {
         wss.handleUpgrade(req, socket, head, (ws) => {
-
             wss.emit("connection", ws, req);
-        })
-    } catch (err) {
+        });
+    } catch {
         socket.destroy();
     }
-})
-wss.on("close", (ws: WebSocket, req: Request) => {
-    availableValidators.splice(availableValidators.findIndex(v => v.socket == ws), 1);
-})
-wss.on("message",async (ws: WebSocket, message: string) => {
-    const data = JSON.parse(message) as IncommingMessage;
-    if (data.type == "signup") {
-        const verfied = await verifyMessage(
-            `Signed message for ${data.data.callbackId}, ${data.data.publicKey}`,
-            data.data.publicKey,
-            data.data.signedMessage
-        )
-        if(verfied){
+});
 
+// Previous bug: `message` and `close` were registered on `wss`. They are emitted
+// by each connected WebSocket, so both listeners must be attached here.
+wss.on("connection", (ws, req) => {
+    const ip = req.socket.remoteAddress ?? "unknown";
+
+    ws.on("message", async (rawMessage) => {
+        try {
+            const data = parseIncomingMessage(rawMessage.toString());
+            if (!data) {
+                ws.close(1008, "Invalid message");
+                return;
+            }
+
+            if (data.type === "signup") {
+                const verified = verifyMessage(
+                    `Signed message for ${data.data.callbackId}, ${data.data.publicKey}`,
+                    data.data.publicKey,
+                    data.data.signedMessage,
+                );
+
+                if (!verified) {
+                    ws.close(1008, "Invalid signup signature");
+                    return;
+                }
+
+                // Do not trust a client-supplied IP; use the peer address instead.
+                await signUpHandler(ws, { ...data.data, ip });
+                return;
+            }
+
+            const pending = CALLBACKS.get(data.data.callbackId);
+            if (!pending) {
+                // A late or unsolicited response must not crash the hub.
+                console.warn(`Ignoring unknown callback ${data.data.callbackId}`);
+                return;
+            }
+
+            // Delete before awaiting so a validator cannot submit the same job twice.
+            CALLBACKS.delete(data.data.callbackId);
+            clearTimeout(pending.timeout);
+            await pending.handler(data.data);
+        } catch (error) {
+            console.error("Failed to process validator message", error);
         }
-    }
-    if (data.type == "validate"){
-        CALLBACKS[data.data.callbackId](data);
-        delete CALLBACKS[data.data.callbackId];
-    }
-})
+    });
 
-const verifyMessage = async (message: string, publicKey: string, signature: string) => {
+    ws.on("close", () => {
+        // `findIndex` can be -1; filter avoids accidentally removing the last validator.
+        const index = availableValidators.findIndex((validator) => validator.socket === ws);
+        if (index !== -1) availableValidators.splice(index, 1);
+    });
+});
+
+function parseIncomingMessage(message: string): IncommingMessage | null {
+    // Previous bug: JSON was asserted as a trusted type. Parse and validate the
+    // untrusted WebSocket payload before reading fields from it.
+    let value: unknown;
+    try {
+        value = JSON.parse(message);
+    } catch {
+        return null;
+    }
+
+    if (!value || typeof value !== "object") return null;
+    const candidate = value as { type?: unknown; data?: Record<string, unknown> };
+    const data = candidate.data;
+    if (!data) return null;
+
+    if (
+        candidate.type === "signup" &&
+        typeof data.publicKey === "string" &&
+        typeof data.signedMessage === "string" &&
+        typeof data.callbackId === "string"
+    ) {
+        return {
+            type: "signup",
+            data: {
+                // This value is ignored; the server obtains the actual peer IP.
+                ip: typeof data.ip === "string" ? data.ip : "",
+                publicKey: data.publicKey,
+                signedMessage: data.signedMessage,
+                callbackId: data.callbackId,
+            },
+        };
+    }
+
+    if (
+        candidate.type === "validate" &&
+        typeof data.callbackId === "string" &&
+        typeof data.signedMessage === "string" &&
+        typeof data.validatorId === "string" &&
+        (data.status === "Good" || data.status === "Bad") &&
+        typeof data.latency === "number" &&
+        Number.isFinite(data.latency)
+    ) {
+        return {
+            type: "validate",
+            data: {
+                callbackId: data.callbackId,
+                signedMessage: data.signedMessage,
+                validatorId: data.validatorId,
+                status: data.status,
+                latency: data.latency,
+                websiteId: typeof data.websiteId === "string" ? data.websiteId : "",
+            },
+        };
+    }
+
+    return null;
+}
+
+function verifyMessage(message: string, publicKey: string, signature: string) {
     const messageBytes = nacl_util.decodeUTF8(message);
-    const result = nacl.sign.detached.verify(
+    return nacl.sign.detached.verify(
         messageBytes,
         new Uint8Array(JSON.parse(signature)),
-        new PublicKey(publicKey).toBytes()
-    )
-
-    return result
+        new PublicKey(publicKey).toBytes(),
+    );
 }
-const signUpHandler = async (ws: WebSocket, {ip,publicKey,signedMessage,callbackId} : SignUpIncommingMessage) => {
-    const validatorDb = await db.validator.findFirst({
-        where : {
-            publicKey : publicKey
-        }
-    })
 
-    if(validatorDb){
-        ws.send(JSON.stringify({
-            type : "signup",
-            data : {
-                callbackId,
-                validatorId : validatorDb.id
-            }
-        }))
+async function signUpHandler(
+    ws: WebSocket,
+    { ip, publicKey, callbackId }: SignUpIncommingMessage,
+) {
+    let validator = await db.validator.findFirst({ where: { publicKey } });
 
-        availableValidators.push({
-            validatorId : validatorDb.id,
-            socket : ws,
-            publicKey : validatorDb.publicKey
+    if (!validator) {
+        validator = await db.validator.create({
+            data: { ip, publicKey, location: "unknown", pendingPayout: 0 },
         });
-        return 
     }
 
-    // TODO : write a logic to get location of the validator from the ip address and store it in the database
-    const validator = await db.validator.create({
-        data : {
-            ip,
-            publicKey,
-            location : "unknown",
-            pendingPayout : 0,
-        }
-    })
+    // Previous bug: new database rows were pushed without their socket, making
+    // them unusable for dispatch. Replace any duplicate registration for this socket.
+    const existingIndex = availableValidators.findIndex((item) => item.socket === ws);
+    if (existingIndex !== -1) availableValidators.splice(existingIndex, 1);
+    availableValidators.push({
+        validatorId: validator.id,
+        socket: ws,
+        publicKey: validator.publicKey,
+    });
 
-    ws.send(JSON.stringify({
-        type : "signup",
-        data : {
-            callbackId,
-            validatorId : validator.id
-        }
-    }))
+    ws.send(
+        JSON.stringify({
+            type: "signup",
+            data: { callbackId, validatorId: validator.id },
+        }),
+    );
 }
 
-// TODO : write a logic to distribute the validate request to the avaliable validator such that there are various group of validator having to validate one website from different locations and there should be minimum more than 2 validator for each location
-setInterval(async () => {
-    const WebsiteToMonitor = await db.website.findMany({
-        where : {
-            disabled : false
-        }
-    })
+async function dispatchValidations() {
+    try {
+        const websitesToMonitor = await db.website.findMany({
+            where: { disabled: false },
+        });
 
-    for(const website of WebsiteToMonitor){
-         availableValidators.forEach(validator=>{
-            const callbackId = uuidv4();
-            console.log(`sending validate request to ${validator.validatorId} for website ${website.url}`)
-            validator.socket.send(JSON.stringify({
-                type : "validate",
-                data : {
-                    url : website.url,
-                    callbackId
-                }
-            }))
+        for (const website of websitesToMonitor) {
+            for (const validator of availableValidators) {
+                if (validator.socket.readyState !== WebSocket.OPEN) continue;
 
-            CALLBACKS[callbackId] = async (data : IncommingMessage) => {
-                if(data.type == "validate"){
-                    const {validatorId,signedMessage,status,latency} = data.data;
-                    const verified = await verifyMessage(
-                        `Replaying to CallbackId ${data.data.callbackId}`,
-                        validator.publicKey,
-                        signedMessage
+                const callbackId = uuidv4();
+                const timeout = setTimeout(() => {
+                    CALLBACKS.delete(callbackId);
+                }, VALIDATION_TIMEOUT_MS);
+
+                CALLBACKS.set(callbackId, {
+                    timeout,
+                    handler: async (data) => {
+                        const verified = verifyMessage(
+                            `Replaying to CallbackId ${data.callbackId}`,
+                            validator.publicKey,
+                            data.signedMessage,
+                        );
+                        if (!verified) return;
+
+                        await db.$transaction(async (tx) => {
+                            await tx.websiteTicks.create({
+                                data: {
+                                    websiteId: website.id,
+                                    // Previous bug: this used the message's validatorId. Use the
+                                    // validator associated with the socket that received the job.
+                                    validatorId: validator.validatorId,
+                                    status: data.status,
+                                    latency: data.latency,
+                                },
+                            });
+                            await tx.validator.update({
+                                where: { id: validator.validatorId },
+                                data: {
+                                    pendingPayout: { increment: COST_PER_VALIDATION },
+                                },
+                            });
+                        });
+                    },
+                });
+
+                try {
+                    validator.socket.send(
+                        JSON.stringify({
+                            type: "validate",
+                            data: { url: website.url, websiteId: website.id, callbackId },
+                        }),
                     );
-
-                    if(!verified){
-                        return
-                    }
-                    
-                    await db.$transaction(async (tx)=>{
-                        await tx.websiteTicks.create({
-                            data : {
-                                websiteId : website.id,
-                                validatorId : validatorId,
-                                status : status,
-                                latency : latency,
-                                createdAt : new Date()
-                            }
-                        })
-
-                        await tx.validator.update({
-                            where : {id : validatorId},
-                            data : {
-                                pendingPayout : {
-                                    increment : COST_PER_VALDATION
-                                }
-                            }
-                        })
-                    })
-
+                } catch (error) {
+                    clearTimeout(timeout);
+                    CALLBACKS.delete(callbackId);
+                    console.error(`Failed to dispatch validation to ${validator.validatorId}`, error);
                 }
             }
-        })
+        }
+    } catch (error) {
+        console.error("Failed to dispatch validations", error);
     }
-},1000 * 60)
+}
+
+setInterval(() => {
+    void dispatchValidations();
+}, 60_000);
+
+const hubPort = Number(process.env.PORT) || 3001;
+server.listen(hubPort, () => {
+    console.log(`Hub running on port ${hubPort}`);
+});
