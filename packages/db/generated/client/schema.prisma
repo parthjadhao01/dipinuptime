@@ -69,11 +69,12 @@ model Website {
 }
 
 model Validator {
-  id        String         @id @default(uuid())
-  publicKey String
-  location  String
-  ip        String
-  ticks     WebsiteTicks[]
+  id            String         @id @default(uuid())
+  publicKey     String
+  location      String
+  ip            String
+  pendingPayout Int
+  ticks         WebsiteTicks[]
 }
 
 model WebsiteTicks {
