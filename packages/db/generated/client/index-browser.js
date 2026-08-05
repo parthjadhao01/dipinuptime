@@ -164,7 +164,8 @@ exports.Prisma.ValidatorScalarFieldEnum = {
   id: 'id',
   publicKey: 'publicKey',
   location: 'location',
-  ip: 'ip'
+  ip: 'ip',
+  pendingPayout: 'pendingPayout'
 };
 
 exports.Prisma.WebsiteTicksScalarFieldEnum = {
