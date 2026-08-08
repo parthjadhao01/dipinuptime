@@ -33,6 +33,9 @@ importers:
       '@auth/express':
         specifier: ^0.12.1
         version: 0.12.1(express@5.2.1)(nodemailer@8.0.1)
+      '@repo/common':
+        specifier: workspace:*
+        version: link:../../packages/common
       '@repo/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -73,6 +76,9 @@ importers:
 
   apps/hub:
     dependencies:
+      '@repo/common':
+        specifier: workspace:*
+        version: link:../../packages/common
       '@repo/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -92,15 +98,15 @@ importers:
         specifier: ^8.20.0
         version: 8.20.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     devDependencies:
-      '@repo/common':
-        specifier: workspace:*
-        version: link:../../packages/common
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
 
   apps/validator:
     dependencies:
+      '@repo/common':
+        specifier: workspace:*
+        version: link:../../packages/common
       '@solana/web3.js':
         specifier: ^1.98.4
         version: 1.98.4(bufferutil@4.1.0)(typescript@5.9.2)(utf-8-validate@6.0.6)
@@ -117,9 +123,6 @@ importers:
         specifier: ^8.20.0
         version: 8.20.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     devDependencies:
-      '@repo/common':
-        specifier: workspace:*
-        version: link:../../packages/common
       '@types/node':
         specifier: ^26.1.2
         version: 26.1.2
@@ -324,6 +327,10 @@ importers:
         version: 5.9.2
 
   packages/common:
+    dependencies:
+      zod:
+        specifier: ^4.3.5
+        version: 4.3.6
     devDependencies:
       '@repo/typescript-config':
         specifier: workspace:*
@@ -486,6 +493,7 @@ packages:
   '@clerk/clerk-react@5.60.0':
     resolution: {integrity: sha512-P88FncsJpq/3WZJhhlj+md8mYb35BIXpr462C/figwsBGHsinr8VuBQUMcMZZ/6M34C8ABfLTPa6PHVp6+3D5Q==}
     engines: {node: '>=18.17.0'}
+    deprecated: 'This package is no longer supported. Please use @clerk/react instead. See the upgrade guide for more info: https://clerk.com/docs/guides/development/upgrading/upgrade-guides/core-3'
     peerDependencies:
       react: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
       react-dom: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
@@ -513,6 +521,7 @@ packages:
   '@clerk/types@4.101.14':
     resolution: {integrity: sha512-jl7DywmeaZx1IntgEXcjDZq2uyk+X/1yAZOjxOboeGTS0rNTiQNhv7xK8tFVjexsUAFrYlwC1AxhFuJiMDQjow==}
     engines: {node: '>=18.17.0'}
+    deprecated: 'This package is no longer supported. Please import types from @clerk/shared/types instead. See the upgrade guide for more info: https://clerk.com/docs/guides/development/upgrading/upgrade-guides/core-3'
 
   '@date-fns/tz@1.4.1':
     resolution: {integrity: sha512-P5LUNhtbj6YfI3iJjw5EL9eUAG6OitD0W3fWQcpQjDRc/QIsL0tRNuO1PcDvPccWL1fSTXXdE1ds+l95DV/OFA==}
@@ -3777,6 +3786,7 @@ packages:
   recharts@2.15.4:
     resolution: {integrity: sha512-UT/q6fwS3c1dHbXv2uFgYJ9BMFHu3fwnd7AYZaEQhXuYQ4hgsxLvsUXzGdKeZrW5xopzDCvuA2N41WJ88I7zIw==}
     engines: {node: '>=14'}
+    deprecated: 1.x and 2.x branches are no longer active. Bump to Recharts v3 to receive latest features and bugfixes. See https://github.com/recharts/recharts/wiki/3.0-migration-guide
     peerDependencies:
       react: ^16.0.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
       react-dom: ^16.0.0 || ^17.0.0 || ^18.0.0 || ^19.0.0

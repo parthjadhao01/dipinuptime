@@ -4,8 +4,19 @@ import {db} from "./config/db.ts"
 import {authMiddleware} from "./middleware";
 import cookieParser from 'cookie-parser';
 import cors from "cors"
+import { MonitorCreateSchema } from "@repo/common";
 
 const app = express();
+
+const serializeWebsite = (website: {
+    ticks: Array<{ status: "Good" | "Bad" }>;
+}) => ({
+    ...website,
+    ticks: website.ticks.map((tick) => ({
+        ...tick,
+        status: tick.status === "Good" ? "up" : "down",
+    })),
+});
 
 app.use(express.json());
 app.use(cookieParser());
@@ -20,7 +31,11 @@ app.post("/api/v1/website",authMiddleware,async (req ,res)=>{
     const userId = req?.user?.id!;
     console.log(userId)
     console.log(req.body)
-    const {url} = req.body
+    const parsedBody = MonitorCreateSchema.safeParse(req.body);
+    if (!parsedBody.success) {
+        return res.status(400).json({ message: "Invalid monitor URL" });
+    }
+    const { url } = parsedBody.data;
     const data = await db.website.create({
         data : {
             userId,
@@ -32,7 +47,7 @@ app.post("/api/v1/website",authMiddleware,async (req ,res)=>{
     })
 })
 
-app.get("/api/v1//website/status",async (req,res)=>{
+app.get("/api/v1/website/status",authMiddleware,async (req,res)=>{
     const websiteId = req.query.websiteId! as unknown as string;
     const userId = req?.user?.id!;
     const data = await db.website.findFirst({
@@ -46,7 +61,7 @@ app.get("/api/v1//website/status",async (req,res)=>{
         }
     })
 
-    res.json(data)
+    res.json(data ? serializeWebsite(data) : null)
 })
 
 app.get("/api/v1/website",authMiddleware,async (req,res)=>{
@@ -60,7 +75,7 @@ app.get("/api/v1/website",authMiddleware,async (req,res)=>{
             ticks : true
         }
     })
-    res.json(websites)
+    res.json(websites.map(serializeWebsite))
 })
 
 app.delete("/api/v1/website/:id",async (req,res)=>{

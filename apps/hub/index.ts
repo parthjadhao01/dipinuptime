@@ -1,6 +1,7 @@
 import http from "http";
 import { v4 as uuidv4 } from "uuid";
 import {
+    IncomingMessageSchema,
     type IncommingMessage,
     type SignUpIncommingMessage,
     type ValidateIncommingMessage,
@@ -94,8 +95,6 @@ wss.on("connection", (ws, req) => {
 });
 
 function parseIncomingMessage(message: string): IncommingMessage | null {
-    // Previous bug: JSON was asserted as a trusted type. Parse and validate the
-    // untrusted WebSocket payload before reading fields from it.
     let value: unknown;
     try {
         value = JSON.parse(message);
@@ -103,52 +102,8 @@ function parseIncomingMessage(message: string): IncommingMessage | null {
         return null;
     }
 
-    if (!value || typeof value !== "object") return null;
-    const candidate = value as { type?: unknown; data?: Record<string, unknown> };
-    const data = candidate.data;
-    if (!data) return null;
-
-    if (
-        candidate.type === "signup" &&
-        typeof data.publicKey === "string" &&
-        typeof data.signedMessage === "string" &&
-        typeof data.callbackId === "string"
-    ) {
-        return {
-            type: "signup",
-            data: {
-                // This value is ignored; the server obtains the actual peer IP.
-                ip: typeof data.ip === "string" ? data.ip : "",
-                publicKey: data.publicKey,
-                signedMessage: data.signedMessage,
-                callbackId: data.callbackId,
-            },
-        };
-    }
-
-    if (
-        candidate.type === "validate" &&
-        typeof data.callbackId === "string" &&
-        typeof data.signedMessage === "string" &&
-        typeof data.validatorId === "string" &&
-        (data.status === "Good" || data.status === "Bad") &&
-        typeof data.latency === "number" &&
-        Number.isFinite(data.latency)
-    ) {
-        return {
-            type: "validate",
-            data: {
-                callbackId: data.callbackId,
-                signedMessage: data.signedMessage,
-                validatorId: data.validatorId,
-                status: data.status,
-                latency: data.latency,
-                websiteId: typeof data.websiteId === "string" ? data.websiteId : "",
-            },
-        };
-    }
-
-    return null;
+    const result = IncomingMessageSchema.safeParse(value);
+    return result.success ? result.data : null;
 }
 
 function verifyMessage(message: string, publicKey: string, signature: string) {
@@ -222,7 +177,7 @@ async function dispatchValidations() {
                                     // Previous bug: this used the message's validatorId. Use the
                                     // validator associated with the socket that received the job.
                                     validatorId: validator.validatorId,
-                                    status: data.status,
+                                    status: data.status === "up" ? "Good" : "Bad",
                                     latency: data.latency,
                                 },
                             });

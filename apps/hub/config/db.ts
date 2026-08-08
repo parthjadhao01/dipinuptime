@@ -1,6 +1,3 @@
-// @ts-ignore
-import {PrismaClient} from "@repo/db"
+import { prisma } from "@repo/db";
 
-const client = new PrismaClient();
-
-export const db = client
+export const db = prisma;
