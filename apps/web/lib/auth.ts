@@ -1,108 +1,125 @@
-import { PrismaAdapter } from "@next-auth/prisma-adapter"
-import {createTransport} from "nodemailer"
-import {prisma} from "@repo/db";
-import jwt from "jsonwebtoken"
+import { PrismaAdapter } from "@next-auth/prisma-adapter";
+import { createTransport } from "nodemailer";
+import { prisma } from "@repo/db";
+import jwt from "jsonwebtoken";
 
-import EmailProvider, {SendVerificationRequestParams} from "next-auth/providers/email";
+import EmailProvider, {
+  SendVerificationRequestParams,
+} from "next-auth/providers/email";
 
 export const NEXT_AUTH_CONFIG = {
-    adapter: PrismaAdapter(prisma),
-    session : {
-        strategy : "jwt" as const
-    },
-    providers: [
-        EmailProvider({
-            server: {
-                host: process.env.EMAIL_SERVER_HOST,
-                port: Number(process.env.EMAIL_SERVER_PORT),
-                secure: false,
-                auth: {
-                    user: process.env.EMAIL_SERVER_USER,
-                    pass: process.env.EMAIL_SERVER_PASSWORD,
-                },
-            },
-            from: process.env.EMAIL_FROM,
-            async sendVerificationRequest(params : SendVerificationRequestParams){
-                console.log("sending email verification request...")
-                const {identifier, url, provider} = params;
-                const {host} = new URL(url);
-                const transport = createTransport({
-                    host: process.env.EMAIL_SERVER_HOST!,
-                    port: Number(process.env.EMAIL_SERVER_PORT!),
-                    secure: false,
-                    auth: {
-                        user: process.env.EMAIL_SERVER_USER!,
-                        pass: process.env.EMAIL_SERVER_PASSWORD!,
-                    },
-                })
-                const result = await transport.sendMail({
-                    secure : false,
-                    to : identifier,
-                    from : provider.from,
-                    subject: `sigin in to ${host}`,
-                    text : text({url,host}),
-                    html : html({url,host})
-                })
-                console.log(result)
-                if (result.rejected?.length) {
-                    throw new Error(`Email(s) (${result.rejected.join(", ")}) could not be sent`)
-                }
-            },
-        }),
-    ],
-    secret: process.env.NEXTAUTH_SECRET,
-    callbacks: {
-        async jwt({token,user} : any){
-            if(user){
-                token.email = user.email;
-                token.id = user.id;
-
-                const accessToken = jwt.sign(
-                    {
-                        id: token.id,
-                        email: token.email,
-                    },
-                    process.env.NEXTAUTH_SECRET!,
-                    { expiresIn: "1h" }
-                );
-
-                token.accessToken = accessToken;
-            }
-
-            return token;
+  adapter: PrismaAdapter(prisma),
+  session: {
+    strategy: "jwt" as const,
+  },
+  providers: [
+    EmailProvider({
+      server: {
+        host: process.env.EMAIL_SERVER_HOST,
+        port: Number(process.env.EMAIL_SERVER_PORT),
+        secure: false,
+        auth: {
+          user: process.env.EMAIL_SERVER_USER,
+          pass: process.env.EMAIL_SERVER_PASSWORD,
         },
-
-        async session({ session, user ,token} : any) {
-            session.user.email = token.email;
-            session.user.id = token.id
-
-            session.accessToken = token.accessToken;
-
-            return session
+      },
+      from: process.env.EMAIL_FROM,
+      async sendVerificationRequest(params: SendVerificationRequestParams) {
+        console.log("sending email verification request...");
+        const { identifier, url, provider } = params;
+        const { host } = new URL(url);
+        const transport = createTransport({
+          host: process.env.EMAIL_SERVER_HOST!,
+          port: Number(process.env.EMAIL_SERVER_PORT!),
+          secure: false,
+          auth: {
+            user: process.env.EMAIL_SERVER_USER!,
+            pass: process.env.EMAIL_SERVER_PASSWORD!,
+          },
+        });
+        const result = await transport.sendMail({
+          secure: false,
+          to: identifier,
+          from: provider.from,
+          subject: `sigin in to ${host}`,
+          text: text({ url, host }),
+          html: html({ url, host }),
+        });
+        console.log(result);
+        if (result.rejected?.length) {
+          throw new Error(
+            `Email(s) (${result.rejected.join(", ")}) could not be sent`,
+          );
         }
+      },
+    }),
+  ],
+  secret: process.env.NEXTAUTH_SECRET,
+  callbacks: {
+    async jwt({
+      token,
+      user,
+    }: {
+      token: Record<string, string>;
+      user: Record<string, string> | undefined;
+    }) {
+      if (user) {
+        token.email = user.email;
+        token.id = user.id;
+
+        const accessToken = jwt.sign(
+          {
+            id: token.id,
+            email: token.email,
+          },
+          process.env.NEXTAUTH_SECRET!,
+          { expiresIn: "1h" },
+        );
+
+        token.accessToken = accessToken;
+      }
+
+      return token;
     },
-    pages: {
-        signIn: "/signin",   // your custom sign in page route
-        signOut: "/",        // redirect here after sign out
-        error: "/signin",    // auth errors go back to signin
+
+    async session({
+      session,
+      token,
+    }: {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      session: Record<string, any>;
+      token: Record<string, string>;
+    }) {
+      session.user.email = token.email;
+      session.user.id = token.id;
+
+      session.accessToken = token.accessToken;
+
+      return session;
     },
-}
+  },
+  pages: {
+    signIn: "/signin", // your custom sign in page route
+    signOut: "/", // redirect here after sign out
+    error: "/signin", // auth errors go back to signin
+  },
+};
 
 export function html(params: { url: string; host: string }) {
-    const { url, host } = params
+  const { url, host } = params;
 
-    const escapedHost = host.replace(/\./g, "&#8203;.")
+  const escapedHost = host.replace(/\./g, "&#8203;.");
 
-    const color = {
-        background: "#f9f9f9",
-        text: "#444444",
-        mainBackground: "#ffffff",
-        buttonBackground: "#346df1",
-        buttonBorder: "#346df1",
-        buttonText: "#ffffff",
-    }
+  const color = {
+    background: "#f9f9f9",
+    text: "#444444",
+    mainBackground: "#ffffff",
+    buttonBackground: "#346df1",
+    buttonBorder: "#346df1",
+    buttonText: "#ffffff",
+  };
 
-    return `
+  return `
 <body style="margin:0; padding:0; background-color:${color.background};">
   <table width="100%" cellpadding="0" cellspacing="0" border="0">
     <tr>
@@ -156,11 +173,10 @@ export function html(params: { url: string; host: string }) {
     </tr>
   </table>
 </body>
-`
+`;
 }
 
-
 /** Email Text body (fallback for email clients that don't render HTML, e.g. feature phones) */
-function text({ url, host }: { url: string, host: string }) {
-    return `Sign in to ${host}\n${url}\n\n`
+function text({ url, host }: { url: string; host: string }) {
+  return `Sign in to ${host}\n${url}\n\n`;
 }

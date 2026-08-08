@@ -33,18 +33,18 @@ The MVP explicitly excludes:
 
 ## 3. System components and ownership
 
-| Component | Responsibility | Durable source of truth |
-|---|---|---|
-| Frontend | Customer dashboard, monitor configuration, status/history display | None; reads API data |
-| Backend API | Authentication, authorization, monitor management, customer-facing queries | PostgreSQL |
-| Scheduler | Creates due check runs and assigns ownership to a hub partition | PostgreSQL |
-| Hub workers | Select validators, dispatch work, process observations, aggregate results | PostgreSQL plus durable queue |
-| Connection gateway | Maintains validator sessions and routes assignments to active connections | Shared connection registry; not authoritative |
-| Validator | Safely performs assigned HTTP(S) checks and signs observations | Local ephemeral state and protected key material |
-| PostgreSQL | Monitor configuration, check state, observations, aggregates, incidents, audit records | Authoritative system record |
-| Durable queue | Dispatch, retry, delayed work, dead letters | Queue backend |
-| Redis | Shared connection routing, rate limits, short-lived cache, live events | Never the authoritative job/result record |
-| Solana programs (later) | Validator stake lifecycle and batched settlement commitments | On-chain program state |
+| Component               | Responsibility                                                                         | Durable source of truth                          |
+| ----------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Frontend                | Customer dashboard, monitor configuration, status/history display                      | None; reads API data                             |
+| Backend API             | Authentication, authorization, monitor management, customer-facing queries             | PostgreSQL                                       |
+| Scheduler               | Creates due check runs and assigns ownership to a hub partition                        | PostgreSQL                                       |
+| Hub workers             | Select validators, dispatch work, process observations, aggregate results              | PostgreSQL plus durable queue                    |
+| Connection gateway      | Maintains validator sessions and routes assignments to active connections              | Shared connection registry; not authoritative    |
+| Validator               | Safely performs assigned HTTP(S) checks and signs observations                         | Local ephemeral state and protected key material |
+| PostgreSQL              | Monitor configuration, check state, observations, aggregates, incidents, audit records | Authoritative system record                      |
+| Durable queue           | Dispatch, retry, delayed work, dead letters                                            | Queue backend                                    |
+| Redis                   | Shared connection routing, rate limits, short-lived cache, live events                 | Never the authoritative job/result record        |
+| Solana programs (later) | Validator stake lifecycle and batched settlement commitments                           | On-chain program state                           |
 
 ## 4. Target monitoring flow
 
@@ -71,16 +71,16 @@ The `CheckRun` lifecycle is durable. A validator WebSocket connection, Redis mes
 
 Raw validator observations and customer-facing status must be separate records.
 
-| Entity | Purpose |
-|---|---|
-| `Monitor` | Customer-owned target, probe policy, interval, and enabled state. |
-| `CheckRun` | One scheduled monitoring interval for one monitor; has a deadline and immutable monitor revision. |
-| `Assignment` | A specific validator’s lease to perform a `CheckRun`. |
-| `Observation` | A signed result from one assignment, including safe evidence metadata. |
-| `Aggregation` | Deterministic final interpretation of observations for a check run. |
-| `Incident` | Idempotent customer-impacting state transition opened/resolved from aggregations. |
-| `Validator` | Validator identity, public key, observed network grouping, capacity, status, and reputation. |
-| `SettlementReceipt` | Later: signed eligible work item used for batched payment calculation. |
+| Entity              | Purpose                                                                                           |
+| ------------------- | ------------------------------------------------------------------------------------------------- |
+| `Monitor`           | Customer-owned target, probe policy, interval, and enabled state.                                 |
+| `CheckRun`          | One scheduled monitoring interval for one monitor; has a deadline and immutable monitor revision. |
+| `Assignment`        | A specific validator’s lease to perform a `CheckRun`.                                             |
+| `Observation`       | A signed result from one assignment, including safe evidence metadata.                            |
+| `Aggregation`       | Deterministic final interpretation of observations for a check run.                               |
+| `Incident`          | Idempotent customer-impacting state transition opened/resolved from aggregations.                 |
+| `Validator`         | Validator identity, public key, observed network grouping, capacity, status, and reputation.      |
+| `SettlementReceipt` | Later: signed eligible work item used for batched payment calculation.                            |
 
 Required data characteristics:
 
@@ -169,12 +169,12 @@ Each monitor policy defines:
 
 Suggested initial outcomes:
 
-| Outcome | Meaning |
-|---|---|
-| `up` | Sufficient independent evidence that the target satisfies the probe policy. |
-| `down` | Sufficient independent evidence of a target-level failure. |
+| Outcome    | Meaning                                                                              |
+| ---------- | ------------------------------------------------------------------------------------ |
+| `up`       | Sufficient independent evidence that the target satisfies the probe policy.          |
+| `down`     | Sufficient independent evidence of a target-level failure.                           |
 | `degraded` | A meaningful regional or network-specific failure exists without global-down quorum. |
-| `unknown` | Insufficient timely, independent evidence; it is not assumed to be up. |
+| `unknown`  | Insufficient timely, independent evidence; it is not assumed to be up.               |
 
 Aggregation must be deterministic: the same accepted observation set and policy revision always produce the same result. The stored aggregate records the policy revision, contributing observations, diversity information, confidence, and reason.
 
@@ -235,15 +235,15 @@ Before public rollout, provide:
 
 ## 14. Execution phases and release gates
 
-| Phase | Outcome | Release gate |
-|---|---|---|
-| 0. Foundation | Shared schemas, CI, status/API consistency, documented MVP decisions | Typecheck/tests/Prisma validation run in CI; one canonical status contract. |
-| 1. Secure validator MVP | Functional validator, signed protocol, SSRF-safe probe | Controlled end-to-end check works; replay and SSRF tests pass. |
-| 2. Durable scheduling | Check-run state machine, outbox, queue, idempotency, multi-hub ownership | Restart/second-hub testing shows no lost or duplicate checks. |
-| 3. Aggregation and incidents | Quorum policy, historical aggregates, incident state | Fixed observation fixtures yield deterministic outcomes. |
-| 4. Validator trust | Registry, diversity-aware selection, reputation | One operator/network cannot satisfy configured quorum alone. |
-| 5. Economics | Batched receipts, stake lifecycle, narrow slashing scope | Settlement root is reproducible; independent security review completed before value at risk. |
-| 6. Production rollout | Observability, runbooks, staging, controlled onboarding | Failure drills and agreed reliability/security SLOs pass. |
+| Phase                        | Outcome                                                                  | Release gate                                                                                 |
+| ---------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| 0. Foundation                | Shared schemas, CI, status/API consistency, documented MVP decisions     | Typecheck/tests/Prisma validation run in CI; one canonical status contract.                  |
+| 1. Secure validator MVP      | Functional validator, signed protocol, SSRF-safe probe                   | Controlled end-to-end check works; replay and SSRF tests pass.                               |
+| 2. Durable scheduling        | Check-run state machine, outbox, queue, idempotency, multi-hub ownership | Restart/second-hub testing shows no lost or duplicate checks.                                |
+| 3. Aggregation and incidents | Quorum policy, historical aggregates, incident state                     | Fixed observation fixtures yield deterministic outcomes.                                     |
+| 4. Validator trust           | Registry, diversity-aware selection, reputation                          | One operator/network cannot satisfy configured quorum alone.                                 |
+| 5. Economics                 | Batched receipts, stake lifecycle, narrow slashing scope                 | Settlement root is reproducible; independent security review completed before value at risk. |
+| 6. Production rollout        | Observability, runbooks, staging, controlled onboarding                  | Failure drills and agreed reliability/security SLOs pass.                                    |
 
 ## 15. Decisions to keep explicit
 
@@ -261,17 +261,17 @@ The following must be marked as a decision—with owner, date, and policy versio
 
 The following defaults are approved for the Foundation phase. Any change requires an update to this table, a policy version increment, and an owner review.
 
-| Decision | Initial policy | Owner | Recorded | Version |
-|---|---|---|---|---|
-| Monitor interval | 60 seconds by default; configurable only between 60 seconds and 1 hour. | Project maintainer | 2026-08-07 | MVP policy v0.1 |
-| Probe policy | HTTP(S) only; ports 80/443; 10-second connection/read deadline; maximum 5 redirects; TLS failures are reported as probe failures. | Project maintainer | 2026-08-07 | MVP policy v0.1 |
-| Initial quorum | Three assignments where capacity allows; two timely independent observations are required for `up` or `down`; otherwise return `unknown`. | Project maintainer | 2026-08-07 | MVP policy v0.1 |
-| Diversity rule | No operator/network group may contribute more than one observation to the minimum quorum. | Project maintainer | 2026-08-07 | MVP policy v0.1 |
-| Retry and dead letters | One retry before a check-run deadline; unresolved failures are retained for review in a dead-letter workflow. | Project maintainer | 2026-08-07 | MVP policy v0.1 |
-| Incident debounce | Open after two consecutive `down` aggregations; resolve after two consecutive `up` aggregations. | Project maintainer | 2026-08-07 | MVP policy v0.1 |
-| Retention | Retain raw observations for 30 days and customer-facing aggregate history for 13 months. | Project maintainer | 2026-08-07 | MVP policy v0.1 |
-| Validator admission | Use an approved validator allowlist only. AWS fallback results are labeled and cannot satisfy decentralized quorum alone. | Project maintainer | 2026-08-07 | MVP policy v0.1 |
-| Billing and settlement | Customer billing and validator compensation stay off-chain during the MVP; no per-check on-chain settlement. | Project maintainer | 2026-08-07 | MVP policy v0.1 |
+| Decision               | Initial policy                                                                                                                            | Owner              | Recorded   | Version         |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ---------- | --------------- |
+| Monitor interval       | 60 seconds by default; configurable only between 60 seconds and 1 hour.                                                                   | Project maintainer | 2026-08-07 | MVP policy v0.1 |
+| Probe policy           | HTTP(S) only; ports 80/443; 10-second connection/read deadline; maximum 5 redirects; TLS failures are reported as probe failures.         | Project maintainer | 2026-08-07 | MVP policy v0.1 |
+| Initial quorum         | Three assignments where capacity allows; two timely independent observations are required for `up` or `down`; otherwise return `unknown`. | Project maintainer | 2026-08-07 | MVP policy v0.1 |
+| Diversity rule         | No operator/network group may contribute more than one observation to the minimum quorum.                                                 | Project maintainer | 2026-08-07 | MVP policy v0.1 |
+| Retry and dead letters | One retry before a check-run deadline; unresolved failures are retained for review in a dead-letter workflow.                             | Project maintainer | 2026-08-07 | MVP policy v0.1 |
+| Incident debounce      | Open after two consecutive `down` aggregations; resolve after two consecutive `up` aggregations.                                          | Project maintainer | 2026-08-07 | MVP policy v0.1 |
+| Retention              | Retain raw observations for 30 days and customer-facing aggregate history for 13 months.                                                  | Project maintainer | 2026-08-07 | MVP policy v0.1 |
+| Validator admission    | Use an approved validator allowlist only. AWS fallback results are labeled and cannot satisfy decentralized quorum alone.                 | Project maintainer | 2026-08-07 | MVP policy v0.1 |
+| Billing and settlement | Customer billing and validator compensation stay off-chain during the MVP; no per-check on-chain settlement.                              | Project maintainer | 2026-08-07 | MVP policy v0.1 |
 
 ## 16. Ready-to-create issue: Foundation
 
