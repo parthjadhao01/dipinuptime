@@ -2,12 +2,13 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { createTransport } from "nodemailer";
 import { prisma } from "@repo/db";
 import jwt from "jsonwebtoken";
+import type { NextAuthOptions } from "next-auth";
 
 import EmailProvider, {
   SendVerificationRequestParams,
 } from "next-auth/providers/email";
 
-export const NEXT_AUTH_CONFIG = {
+export const NEXT_AUTH_CONFIG : NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   session: {
     strategy: "jwt" as const,
@@ -59,12 +60,9 @@ export const NEXT_AUTH_CONFIG = {
     async jwt({
       token,
       user,
-    }: {
-      token: Record<string, string>;
-      user: Record<string, string> | undefined;
     }) {
       if (user) {
-        token.email = user.email;
+        token.email = user.email ?? undefined;
         token.id = user.id;
 
         const accessToken = jwt.sign(
@@ -85,15 +83,11 @@ export const NEXT_AUTH_CONFIG = {
     async session({
       session,
       token,
-    }: {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      session: Record<string, any>;
-      token: Record<string, string>;
     }) {
       session.user.email = token.email;
-      session.user.id = token.id;
+      session.user.id = token.id!;
 
-      session.accessToken = token.accessToken;
+      session.accessToken = token.accessToken!;
 
       return session;
     },
