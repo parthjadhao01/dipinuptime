@@ -20,7 +20,23 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm format:check
+      - run: |
+          echo "===== COMMIT ====="
+          git rev-parse HEAD
+
+          echo "===== BRANCH ====="
+          git branch --show-current
+
+          echo "===== PRETTIER ====="
+          pnpm exec prettier --version
+
+          echo "===== README HASH ====="
+          sha256sum README.md
+
+          echo "===== README ====="
+          cat README.md
+          echo "===== FORMAT CHECK ====="
+          pnpm exec prettier --check README.md
       - run: pnpm lint
       - run: pnpm check-types
       - run: pnpm test
