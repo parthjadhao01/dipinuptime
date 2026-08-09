@@ -95,15 +95,15 @@ pnpm dev
 
 ## Current roadmap
 
-| Phase | Focus |
-|---|---|
-| Foundation | Shared runtime contracts, CI, consistent API status vocabulary |
-| Secure validator MVP | Signed assignments/results and SSRF-safe HTTP(S) probing |
-| Durable monitoring | Check-run state machine, outbox/queue, retries, multi-hub ownership |
-| Aggregation | Quorum policy, incidents, history, `up` / `down` / `degraded` / `unknown` |
-| Validator trust | Registry, diversity-aware selection, reputation, transparent fallback behavior |
-| Economics | Batched receipts, stake lifecycle, objective-only slashing rules |
-| Production rollout | Observability, runbooks, staging, controlled validator onboarding |
+| Phase                | Focus                                                                          |
+| -------------------- | ------------------------------------------------------------------------------ |
+| Foundation           | Shared runtime contracts, CI, consistent API status vocabulary                 |
+| Secure validator MVP | Signed assignments/results and SSRF-safe HTTP(S) probing                       |
+| Durable monitoring   | Check-run state machine, outbox/queue, retries, multi-hub ownership            |
+| Aggregation          | Quorum policy, incidents, history, `up` / `down` / `degraded` / `unknown`      |
+| Validator trust      | Registry, diversity-aware selection, reputation, transparent fallback behavior |
+| Economics            | Batched receipts, stake lifecycle, objective-only slashing rules               |
+| Production rollout   | Observability, runbooks, staging, controlled validator onboarding              |
 
 ## Security and economics
 

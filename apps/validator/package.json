@@ -1,16 +1,17 @@
 {
   "name": "validator",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "private": true,
+  "description": "Dipin Uptime validator client.",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "tsx index.ts",
+    "start": "tsx index.ts",
+    "check-types": "tsc --noEmit",
+    "test": "node --test"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
+    "@repo/common": "workspace:*",
     "@solana/web3.js": "^1.98.4",
     "tweetnacl": "^1.0.3",
     "tweetnacl-util": "^0.15.1",
@@ -18,7 +19,6 @@
     "ws": "^8.20.0"
   },
   "devDependencies": {
-    "@repo/common": "workspace:*",
     "@types/node": "^26.1.2",
     "@types/ws": "8.18.1"
   }
